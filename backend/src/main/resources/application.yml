@@ -1,0 +1,47 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: api-security-analyzer
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# CORS configuration
+cors:
+  allowed-origins: http://localhost:3000
+
+# AI Agent configuration (Yandex GPT)
+yandexgpt:
+  api-url: https://llm.api.cloud.yandex.net/v1/chat/completions
+  api-key: ${YA_AKI_KEY:AQVNz_N0oxosDrP3x5vzLLW3T5AICnEEV9np5ACS}
+  folder-id: b1gb22ss4gkbdgljv9gt
+  modelUri: gpt://b1gb22ss4gkbdgljv9gt/qwen3-235b-a22b-fp8/latest
+  timeout: 30000
+  enabled: true
+
+# Analysis configuration
+analysis:
+  timeout: 300000  # 5 minutes
+  max-concurrent-requests: 10
+  rate-limit-delay: 300  # ms between requests (базовая задержка между запросами) - увеличено для избежания 429
+  rate-limit-max-delay: 30000  # максимальная задержка при exponential backoff (мс) - увеличено до 30 секунд
+  rate-limit-max-retries: 5  # максимальное количество повторных попыток при 429
+  rate-limit-backoff-multiplier: 2.5  # множитель для exponential backoff - увеличен для более агрессивного backoff
+
+# Banking API authentication configuration
+banking:
+  auth:
+    url: https://vbank.open.bankingapi.ru/auth/bank-token
+    client-id: ${BANKING_CLIENT_ID:team293}
+    client-secret: ${BANKING_CLIENT_SECRET:ckO6zZ0YB8vDX8027zGAOzN0VTpI4rYD}
+
+logging:
+  level:
+    com.vtb.apisecurity: DEBUG
+    org.springframework.web: INFO
+

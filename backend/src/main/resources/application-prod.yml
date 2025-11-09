@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-security-analyzer
+
+# CORS configuration for production
+cors:
+  allowed-origins: https://vtb.seag.pro
+
+# AI Agent configuration (Yandex GPT)
+yandexgpt:
+  api-url: https://llm.api.cloud.yandex.net/v1/chat/completions
+  folder-id: ${YANDEX_FOLDER_ID:b1gb22ss4gkbdgljv9gt}
+  modelUri: ${YANDEX_GPT_MODEL_URI:gpt://b1gb22ss4gkbdgljv9gt/qwen3-235b-a22b-fp8/latest}
+  timeout: 30000
+  enabled: true
+
+# Analysis configuration
+analysis:
+  timeout: 300000  # 5 minutes
+  max-concurrent-requests: 10
+
+logging:
+  level:
+    com.vtb.apisecurity: INFO
+    org.springframework.web: WARN
+

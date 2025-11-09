@@ -1,0 +1,169 @@
+.scan-history-table {
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-bottom: 30px;
+}
+
+.scan-history-table h2 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.scan-history-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.scan-history-table th {
+  background: #667eea;
+  color: white;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.scan-history-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.scan-history-table tr:hover {
+  background: #f5f5f5;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-running {
+  background: #2196F3;
+  color: white;
+}
+
+.status-completed {
+  background: #4CAF50;
+  color: white;
+}
+
+.status-failed {
+  background: #f44336;
+  color: white;
+}
+
+.status-cancelled {
+  background: #9E9E9E;
+  color: white;
+}
+
+.status-pending {
+  background: #FF9800;
+  color: white;
+}
+
+.duration-cell {
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.duration-timer {
+  color: #2196F3;
+  font-weight: 600;
+}
+
+.actions-cell {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-view,
+.btn-download,
+.btn-cancel,
+.btn-delete {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.btn-view {
+  background: #667eea;
+  color: white;
+}
+
+.btn-view:hover {
+  background: #5568d3;
+}
+
+.btn-download {
+  background: #4CAF50;
+  color: white;
+}
+
+.btn-download:hover {
+  background: #45a049;
+}
+
+.btn-cancel {
+  background: #ff9800;
+  color: white;
+}
+
+.btn-cancel:hover {
+  background: #f57c00;
+}
+
+.btn-delete {
+  background: #f44336;
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #d32f2f;
+}
+
+.history-loading,
+.history-error,
+.history-empty {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-bottom: 30px;
+}
+
+.history-error {
+  color: #f44336;
+}
+
+.history-empty {
+  color: #666;
+}
+
+@media (max-width: 768px) {
+  .scan-history-table {
+    overflow-x: auto;
+  }
+  
+  .actions-cell {
+    flex-direction: column;
+  }
+  
+  .btn-view,
+  .btn-download,
+  .btn-cancel,
+  .btn-delete {
+    width: 100%;
+  }
+}
+

@@ -1,0 +1,15 @@
+target/
+!target/api-security-analyzer-1.0.0.jar
+*.war
+*.log
+.idea/
+*.iml
+.DS_Store
+node_modules/
+.git/
+.gitignore
+README.md
+ARCHITECTURE.md
+CONTRIBUTING.md
+TESTING.md
+

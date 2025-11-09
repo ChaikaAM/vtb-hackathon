@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: api-security-analyzer-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - AI_AGENT_URL=gpt://b1gb22ss4gkbdgljv9gt/qwen3-235b-a22b-fp8/latest
+      - YANDEX_GPT_API_KEY=${YANDEX_GPT_API_KEY:-AQVNz_N0oxosDrP3x5vzLLW3T5AICnEEV9np5ACS}
+      - YANDEX_FOLDER_ID=${YANDEX_FOLDER_ID:-b1gb22ss4gkbdgljv9gt}
+      - YANDEX_GPT_MODEL_URI=${YANDEX_GPT_MODEL_URI:-gpt://b1gb22ss4gkbdgljv9gt/qwen3-235b-a22b-fp8/latest}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/analysis/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+

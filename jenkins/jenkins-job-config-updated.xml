@@ -1,0 +1,215 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@2.47">
+  <actions>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2118"/>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2118">
+      <jobProperties/>
+      <triggers/>
+      <parameters/>
+      <options/>
+    </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
+  </actions>
+  <description>API Security Analyzer CLI Pipeline</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>GIT_REPO_URL</name>
+          <description>URL Git репозитория (по умолчанию: https://github.com/seagullsoftware/vtbhackathon.git)</description>
+          <defaultValue>https://github.com/seagullsoftware/vtbhackathon.git</defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>GIT_BRANCH</name>
+          <description>Ветка Git репозитория</description>
+          <defaultValue>main</defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>OPENAPI_URL</name>
+          <description>URL OpenAPI спецификации</description>
+          <defaultValue>https://api.example.com/openapi.json</defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>API_BASE_URL</name>
+          <description>Базовый URL API для тестирования</description>
+          <defaultValue>https://api.example.com</defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>SERVER_URL</name>
+          <description>URL сервера анализа</description>
+          <defaultValue>https://vtb.seag.pro</defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>ENABLE_STATIC_ANALYSIS</name>
+          <description>Включить статический анализ</description>
+          <defaultValue>true</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>ENABLE_DYNAMIC_TESTING</name>
+          <description>Включить динамическое тестирование</description>
+          <defaultValue>true</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>ENABLE_CONTRACT_VALIDATION</name>
+          <description>Включить валидацию контракта</description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>DISABLE_AI_ANALYSIS</name>
+          <description>Отключить AI анализ</description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@2.95">
+    <script><![CDATA[pipeline {
+    agent any
+    
+    parameters {
+        string(name: 'GIT_REPO_URL', defaultValue: 'https://github.com/seagullsoftware/vtbhackathon.git', description: 'URL Git репозитория')
+        string(name: 'GIT_BRANCH', defaultValue: 'main', description: 'Ветка Git репозитория')
+        string(name: 'OPENAPI_URL', defaultValue: 'https://api.example.com/openapi.json', description: 'URL OpenAPI спецификации')
+        string(name: 'API_BASE_URL', defaultValue: 'https://api.example.com', description: 'Базовый URL API для тестирования')
+        string(name: 'SERVER_URL', defaultValue: 'https://vtb.seag.pro', description: 'URL сервера анализа')
+        booleanParam(name: 'ENABLE_STATIC_ANALYSIS', defaultValue: true, description: 'Включить статический анализ')
+        booleanParam(name: 'ENABLE_DYNAMIC_TESTING', defaultValue: true, description: 'Включить динамическое тестирование')
+        booleanParam(name: 'ENABLE_CONTRACT_VALIDATION', defaultValue: false, description: 'Включить валидацию контракта')
+        booleanParam(name: 'DISABLE_AI_ANALYSIS', defaultValue: false, description: 'Отключить AI анализ')
+    }
+    
+    environment {
+        REPORT_URL = ''
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    echo "Cloning repository: ${params.GIT_REPO_URL}"
+                    echo "Branch: ${params.GIT_BRANCH}"
+                    
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "*/${params.GIT_BRANCH}"]],
+                        doGenerateSubmoduleConfigurations: false,
+                        extensions: [],
+                        submoduleCfg: [],
+                        userRemoteConfigs: [[url: "${params.GIT_REPO_URL}"]]
+                    ])
+                    
+                    sh 'git rev-parse HEAD > .git/commit.txt'
+                    def commitHash = readFile('.git/commit.txt').trim()
+                    echo "Checked out commit: ${commitHash}"
+                }
+            }
+        }
+        
+        stage('Build CLI') {
+            steps {
+                dir('backend') {
+                    sh '''
+                        echo "Building API Security CLI..."
+                        mvn clean package -DskipTests
+                    '''
+                }
+            }
+        }
+        
+        stage('API Security Scan') {
+            steps {
+                script {
+                    def cliArgs = [
+                        "--openapi-url ${params.OPENAPI_URL}",
+                        "--api-base-url ${params.API_BASE_URL}",
+                        "--server-url ${params.SERVER_URL}"
+                    ]
+                    
+                    if (params.ENABLE_STATIC_ANALYSIS) {
+                        cliArgs.add("--enable-static-analysis")
+                    }
+                    
+                    if (params.ENABLE_DYNAMIC_TESTING) {
+                        cliArgs.add("--enable-dynamic-testing")
+                    }
+                    
+                    if (params.ENABLE_CONTRACT_VALIDATION) {
+                        cliArgs.add("--enable-contract-validation")
+                    }
+                    
+                    if (params.DISABLE_AI_ANALYSIS) {
+                        cliArgs.add("--disable-ai-analysis")
+                    }
+                    
+                    def output = sh(
+                        script: """
+                            cd backend
+                            chmod +x cli.sh
+                            ./cli.sh ${cliArgs.join(' ')}
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo output
+                    
+                    // Извлекаем URL отчета
+                    def matcher = output =~ /REPORT_URL=(.+)/
+                    if (matcher) {
+                        env.REPORT_URL = matcher[0][1]
+                        echo "=========================================="
+                        echo "Report URL: ${env.REPORT_URL}"
+                        echo "=========================================="
+                    } else {
+                        echo "Warning: REPORT_URL not found in output"
+                    }
+                }
+            }
+        }
+        
+        stage('Publish Results') {
+            steps {
+                script {
+                    if (env.REPORT_URL) {
+                        echo """
+========================================
+API Security Scan Completed!
+========================================
+Report URL: ${env.REPORT_URL}
+========================================
+                        """
+                    } else {
+                        echo "Warning: Report URL not available"
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "Pipeline completed successfully!"
+            script {
+                if (env.REPORT_URL) {
+                    echo "Security report available at: ${env.REPORT_URL}"
+                }
+            }
+        }
+        failure {
+            echo "Pipeline failed!"
+        }
+        always {
+            echo "Cleaning up workspace..."
+        }
+    }
+}]]></script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>
+

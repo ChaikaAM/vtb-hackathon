@@ -1,0 +1,69 @@
+@startuml three_banks_problem
+
+!define BANK #E3F2FD
+!define STATIC #FFE0B2
+!define DYNAMIC #F3E5F5
+!define RESULT #FFEBEE
+
+skinparam backgroundColor #FAFAFA
+skinparam borderColor #333
+skinparam fontName Arial
+skinparam fontSize 11
+
+title Описание проблематики
+
+rectangle "ABank API" BANK {
+    component "openApi specification" as abank
+}
+
+package "VBank API" BANK {
+    component "openApi specification" as vbank
+}
+
+package "SBank API" BANK {
+    component "openApi specification" as sbank
+}
+
+package "Статический анализ" STATIC {
+    component "42Crunch\n❌ Только ~300 проверок\n❌ Нет бизнес-логики\n❌ False positives" as static1
+    component "Redocly\n❌ Только linting\n❌ Поверхностный\n❌ Не видит логику" as static2
+    component "SonarQube\n❌ Ориентирован на код\n❌ Не для API\n❌ Слабо на spec" as static3
+}
+
+package "Динамическое тестирование" DYNAMIC {
+    component "Burp Suite\n❌ Ручная настройка\n❌ Требует инженера\n❌ Долгий setup" as dyn1
+    component "OWASP ZAP\n❌ Сценарии жестко\n❌ Фиксированные тесты\n❌ Много ручной работы" as dyn2
+    component "Postman\n❌ Не для security\n❌ Базовые проверки\n❌ Ручное тестирование" as dyn3
+}
+
+package "Результаты: Хаос" RESULT {
+    component "Отчет 1\n(JSON от 42Crunch)" as report1
+    component "Отчет 2\n(HTML от Burp)" as report2
+    component "Отчет 3\n(Excel от Redocly)" as report3
+    component "Отчет 4\n(PDF от ZAP)" as report4
+}
+
+package "Финальная проблема" RESULT {
+    component "❌ Нет единого отчета\n❌ Отчеты не хранятся\n❌ 25-35% ложных срабатываний\n❌ 30-50% уязвимостей пропущено" as final
+}
+
+abank --> static1
+abank --> dyn1
+vbank --> static2
+vbank --> dyn2
+sbank --> static3
+sbank --> dyn3
+
+static1 --> report1
+dyn1 --> report2
+static2 --> report3
+dyn2 --> report4
+static3 --> report4
+dyn3 --> report1
+
+report1 --> final
+report2 --> final
+report3 --> final
+report4 --> final
+
+@enduml

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>API Security Analysis Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+        }
+        .summary {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .vulnerability {
+            border-left: 4px solid #f44336;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #fff;
+            border-radius: 4px;
+        }
+        .severity-critical { border-left-color: #d32f2f; }
+        .severity-high { border-left-color: #f44336; }
+        .severity-medium { border-left-color: #ff9800; }
+        .severity-low { border-left-color: #ffc107; }
+        .severity-info { border-left-color: #2196F3; }
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .badge-critical { background-color: #d32f2f; color: white; }
+        .badge-high { background-color: #f44336; color: white; }
+        .badge-medium { background-color: #ff9800; color: white; }
+        .badge-low { background-color: #ffc107; color: black; }
+        .badge-info { background-color: #2196F3; color: white; }
+        .recommendation {
+            background-color: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>API Security Analysis Report</h1>
+        
+        <div class="summary">
+            <h2>Summary</h2>
+            <p><strong>Scan ID:</strong> <span th:text="${result.scanId}"></span></p>
+            <p><strong>Status:</strong> <span th:text="${result.status}"></span></p>
+            <p><strong>OpenAPI URL:</strong> <span th:text="${result.openApiUrl}"></span></p>
+            <p><strong>API Base URL:</strong> <span th:text="${result.apiBaseUrl}"></span></p>
+            <p><strong>Total Endpoints:</strong> <span th:text="${result.totalEndpoints}"></span></p>
+            <p><strong>Total Vulnerabilities:</strong> <span th:text="${#lists.size(result.vulnerabilities)}"></span></p>
+            <p><strong>Contract Mismatches:</strong> <span th:text="${#lists.size(result.contractMismatches)}"></span></p>
+            <p th:if="${result.summary}"><strong>Summary:</strong> <span th:text="${result.summary}"></span></p>
+        </div>
+        
+        <h2>Vulnerabilities</h2>
+        <div th:if="${#lists.isEmpty(result.vulnerabilities)}">
+            <p>No vulnerabilities found.</p>
+        </div>
+        <div th:each="vuln : ${result.vulnerabilities}" 
+             th:classappend="'vulnerability severity-' + ${vuln.severity.name().toLowerCase()}">
+            <h3>
+                <span th:classappend="'badge badge-' + ${vuln.severity.name().toLowerCase()}" 
+                      th:text="${vuln.severity}"></span>
+                <span th:text="${vuln.title}"></span>
+            </h3>
+            <p><strong>OWASP Category:</strong> <span th:text="${vuln.owaspCategory}"></span></p>
+            <p><strong>Endpoint:</strong> <span th:text="${vuln.endpoint}"></span> 
+               <span th:if="${vuln.method}">(<span th:text="${vuln.method}"></span>)</span></p>
+            <p th:if="${vuln.description}"><strong>Description:</strong> <span th:text="${vuln.description}"></span></p>
+            <p th:if="${vuln.evidence}"><strong>Evidence:</strong> <span th:text="${vuln.evidence}"></span></p>
+            <div th:if="${vuln.recommendation}" class="recommendation">
+                <strong>Recommendation:</strong> <span th:text="${vuln.recommendation}"></span>
+            </div>
+        </div>
+        
+        <h2>Contract Mismatches</h2>
+        <div th:if="${#lists.isEmpty(result.contractMismatches)}">
+            <p>No contract mismatches found.</p>
+        </div>
+        <table th:if="${!#lists.isEmpty(result.contractMismatches)}">
+            <thead>
+                <tr>
+                    <th>Endpoint</th>
+                    <th>Method</th>
+                    <th>Type</th>
+                    <th>Expected</th>
+                    <th>Actual</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="mismatch : ${result.contractMismatches}">
+                    <td th:text="${mismatch.endpoint}"></td>
+                    <td th:text="${mismatch.method}"></td>
+                    <td th:text="${mismatch.type}"></td>
+                    <td th:text="${mismatch.expected}"></td>
+                    <td th:text="${mismatch.actual}"></td>
+                    <td th:text="${mismatch.message}"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+

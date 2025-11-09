@@ -1,0 +1,10 @@
+.git/
+node_modules/
+target/
+build/
+*.log
+.DS_Store
+.idea/
+*.iml
+.env
+
