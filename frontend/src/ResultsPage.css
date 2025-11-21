@@ -74,6 +74,43 @@
   padding: 20px;
 }
 
+.custom-check-result {
+  color: #000 !important;
+}
+
+.custom-check-result h4,
+.custom-check-result h3,
+.custom-check-result h5,
+.custom-check-result p,
+.custom-check-result strong,
+.custom-check-result div {
+  color: #000 !important;
+}
+
+.custom-check-result .check-result-text {
+  color: #000 !important;
+}
+
+.custom-check-result .check-vulnerabilities {
+  color: #000 !important;
+}
+
+.custom-check-result .check-vulnerabilities strong {
+  color: #000 !important;
+}
+
+.custom-check-result .vulnerability {
+  color: #000 !important;
+}
+
+.custom-check-result .vulnerability p {
+  color: #000 !important;
+}
+
+.custom-check-result .vulnerability strong {
+  color: #000 !important;
+}
+
 @media (max-width: 768px) {
   .results-header {
     flex-direction: column;

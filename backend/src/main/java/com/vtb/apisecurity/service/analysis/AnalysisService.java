@@ -1,6 +1,18 @@
 package com.vtb.apisecurity.service.analysis;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
 import com.vtb.apisecurity.model.ContractMismatch;
+import com.vtb.apisecurity.model.CustomCheckResult;
 import com.vtb.apisecurity.model.ScanRequest;
 import com.vtb.apisecurity.model.ScanResult;
 import com.vtb.apisecurity.model.Vulnerability;
@@ -11,19 +23,10 @@ import com.vtb.apisecurity.service.analysis.analyzrs.statical.StaticAnalysisServ
 import com.vtb.apisecurity.service.auth.BankingAuthService;
 import com.vtb.apisecurity.service.openapi.OpenApiParserService;
 import com.vtb.apisecurity.service.report.ReportService;
+
 import io.swagger.v3.oas.models.OpenAPI;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -35,6 +38,7 @@ public class AnalysisService {
     private final DynamicTestingService dynamicTestingService;
     private final ContractValidationService contractValidationService;
     private final AiAgentService aiAgentService;
+    private final CustomCheckService customCheckService;
     private final ReportService reportService;
     private final BankingAuthService bankingAuthService;
     private final ScanHistoryService scanHistoryService;
@@ -52,6 +56,7 @@ public class AnalysisService {
                 .vulnerabilities(new ArrayList<>())
                 .contractMismatches(new ArrayList<>())
                 .endpointAnalyses(new ArrayList<>())
+                .customCheckResults(new ArrayList<>())
                 .build();
         
         // Save initial result
@@ -99,24 +104,38 @@ public class AnalysisService {
             
             // Parse OpenAPI specification
             OpenAPI openAPI = parserService.parseFromUrl(request.getOpenApiUrl());
+            log.info("OpenAPI parsed successfully, paths count: {}", 
+                    openAPI.getPaths() != null ? openAPI.getPaths().size() : 0);
             
             // Count endpoints
             int totalEndpoints = countEndpoints(openAPI);
             result.setTotalEndpoints(totalEndpoints);
+            log.info("Total endpoints counted: {}", totalEndpoints);
             reportService.saveInMemory(result);
             
             ScanRequest.ScanOptions options = request.getOptions() != null ? 
                     request.getOptions() : new ScanRequest.ScanOptions();
+            
+            log.info("[SCAN_OPTIONS] Request options is null: {}", request.getOptions() == null);
+            log.info("[SCAN_OPTIONS] enableStaticAnalysis={}, enableDynamicTesting={}, enableContractValidation={}, enableAiAnalysis={}, customChecks={}", 
+                    options.isEnableStaticAnalysis(), 
+                    options.isEnableDynamicTesting(), 
+                    options.isEnableContractValidation(), 
+                    options.isEnableAiAnalysis(),
+                    options.getCustomChecks() != null ? options.getCustomChecks().size() : "null");
             
             // Static analysis
             if (options.isEnableStaticAnalysis()) {
                 if (Thread.currentThread().isInterrupted()) {
                     throw new InterruptedException("Analysis cancelled");
                 }
-                log.info("Running static analysis");
+                log.info("[STATIC_ANALYSIS] Starting static analysis");
                 List<Vulnerability> staticVulnerabilities = staticAnalysisService.analyze(openAPI);
+                log.info("[STATIC_ANALYSIS] Completed, found {} vulnerabilities", staticVulnerabilities.size());
                 result.getVulnerabilities().addAll(staticVulnerabilities);
                 reportService.saveInMemory(result);
+            } else {
+                log.info("[STATIC_ANALYSIS] Skipped (disabled)");
             }
             
             // Get access token for dynamic analysis
@@ -139,11 +158,14 @@ public class AnalysisService {
                 if (Thread.currentThread().isInterrupted()) {
                     throw new InterruptedException("Analysis cancelled");
                 }
-                log.info("Running dynamic testing");
+                log.info("[DYNAMIC_TESTING] Starting dynamic testing");
                 List<Vulnerability> dynamicVulnerabilities = dynamicTestingService.test(
                         openAPI, request.getApiBaseUrl(), authToken);
+                log.info("[DYNAMIC_TESTING] Completed, found {} vulnerabilities", dynamicVulnerabilities.size());
                 result.getVulnerabilities().addAll(dynamicVulnerabilities);
                 reportService.saveInMemory(result);
+            } else {
+                log.info("[DYNAMIC_TESTING] Skipped (disabled)");
             }
             
             // Contract validation
@@ -151,11 +173,14 @@ public class AnalysisService {
                 if (Thread.currentThread().isInterrupted()) {
                     throw new InterruptedException("Analysis cancelled");
                 }
-                log.info("Running contract validation");
+                log.info("[CONTRACT_VALIDATION] Starting contract validation");
                 List<ContractMismatch> mismatches = contractValidationService.validate(
                         openAPI, request.getApiBaseUrl(), authToken);
+                log.info("[CONTRACT_VALIDATION] Completed, found {} mismatches", mismatches.size());
                 result.setContractMismatches(mismatches);
                 reportService.saveInMemory(result);
+            } else {
+                log.info("[CONTRACT_VALIDATION] Skipped (disabled)");
             }
             
             // AI analysis
@@ -163,9 +188,11 @@ public class AnalysisService {
                 if (Thread.currentThread().isInterrupted()) {
                     throw new InterruptedException("Analysis cancelled");
                 }
-                log.info("Running AI analysis");
+                log.info("[AI_ANALYSIS] Starting AI analysis, vulnerabilities before: {}", result.getVulnerabilities().size());
                 result.setVulnerabilities(aiAgentService.filterFalsePositives(result.getVulnerabilities()));
+                log.info("[AI_ANALYSIS] After filtering false positives: {}", result.getVulnerabilities().size());
                 result.setVulnerabilities(aiAgentService.analyzeVulnerabilities(result.getVulnerabilities()));
+                log.info("[AI_ANALYSIS] After AI analysis: {}", result.getVulnerabilities().size());
                 
                 // Generate recommendations
                 result.getVulnerabilities().forEach(vuln -> {
@@ -174,6 +201,83 @@ public class AnalysisService {
                     }
                 });
                 reportService.saveInMemory(result);
+                log.info("[AI_ANALYSIS] Completed");
+            } else {
+                log.info("[AI_ANALYSIS] Skipped (disabled)");
+            }
+            
+            // Custom checks
+            log.info("Checking custom checks: options.getCustomChecks()={}", 
+                    options.getCustomChecks() != null ? options.getCustomChecks().size() : "null");
+            
+            if (options.getCustomChecks() != null && !options.getCustomChecks().isEmpty()) {
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new InterruptedException("Analysis cancelled");
+                }
+                
+                log.info("Found {} custom checks in request, filtering enabled ones", options.getCustomChecks().size());
+                
+                List<ScanRequest.CustomCheck> enabledChecks = options.getCustomChecks().stream()
+                        .filter(check -> {
+                            boolean enabled = check.isEnabled();
+                            boolean hasName = check.getName() != null && !check.getName().trim().isEmpty();
+                            boolean hasPrompt = check.getPrompt() != null && !check.getPrompt().trim().isEmpty();
+                            
+                            if (!enabled) {
+                                log.info("Custom check '{}' skipped: disabled", check.getName());
+                            }
+                            if (!hasName) {
+                                log.info("Custom check skipped: missing name (ID: {})", check.getId());
+                            }
+                            if (!hasPrompt) {
+                                log.info("Custom check '{}' skipped: missing prompt", check.getName());
+                            }
+                            
+                            return enabled && hasName && hasPrompt;
+                        })
+                        .collect(java.util.stream.Collectors.toList());
+                
+                log.info("After filtering: {} enabled custom checks ready to execute", enabledChecks.size());
+                
+                if (!enabledChecks.isEmpty()) {
+                    log.info("Running {} custom checks", enabledChecks.size());
+                    
+                    List<CustomCheckResult> customResults = new ArrayList<>();
+                    for (ScanRequest.CustomCheck check : enabledChecks) {
+                        if (Thread.currentThread().isInterrupted()) {
+                            throw new InterruptedException("Analysis cancelled");
+                        }
+                        try {
+                            CustomCheckResult checkResult = customCheckService.executeCheck(
+                                    check, openAPI, request.getApiBaseUrl(), authToken);
+                            customResults.add(checkResult);
+                            
+                            // Если проверка нашла уязвимости, добавляем их в общий список
+                            if (checkResult.getVulnerabilities() != null && !checkResult.getVulnerabilities().isEmpty()) {
+                                result.getVulnerabilities().addAll(checkResult.getVulnerabilities());
+                            }
+                        } catch (Exception e) {
+                            log.error("Error executing custom check {}: {}", check.getName(), e.getMessage(), e);
+                            // Создаем результат с ошибкой
+                            customResults.add(CustomCheckResult.builder()
+                                    .checkId(check.getId())
+                                    .checkName(check.getName())
+                                    .category(check.getCategory())
+                                    .status(CustomCheckResult.CheckStatus.ERROR)
+                                    .result("Ошибка выполнения проверки: " + e.getMessage())
+                                    .executedAt(java.time.LocalDateTime.now())
+                                    .build());
+                        }
+                    }
+                    result.setCustomCheckResults(customResults);
+                    reportService.saveInMemory(result);
+                    log.info("Custom checks completed: {} results saved", customResults.size());
+                } else {
+                    log.warn("No enabled custom checks found after filtering. Total checks: {}, Enabled: 0", 
+                            options.getCustomChecks().size());
+                }
+            } else {
+                log.info("Custom checks not executed: options.getCustomChecks() is null or empty");
             }
             
             // Calculate statistics
@@ -186,8 +290,9 @@ public class AnalysisService {
             reportService.saveInMemory(result);
             scanHistoryService.updateHistory(scanId, result);
             
-            log.info("Analysis completed scanId={}, vulnerabilities={}, mismatches={}", 
-                    scanId, result.getVulnerabilities().size(), result.getContractMismatches().size());
+            log.info("Analysis completed scanId={}, vulnerabilities={}, mismatches={}, customChecks={}", 
+                    scanId, result.getVulnerabilities().size(), result.getContractMismatches().size(),
+                    result.getCustomCheckResults() != null ? result.getCustomCheckResults().size() : 0);
             
         } catch (InterruptedException e) {
             throw e;

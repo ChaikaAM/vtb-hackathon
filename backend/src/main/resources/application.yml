@@ -13,13 +13,15 @@ spring:
 
 # CORS configuration
 cors:
-  allowed-origins: http://localhost:3000
+  allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://84.201.161.235}
 
 # AI Agent configuration (Yandex GPT)
 yandexgpt:
   api-url: https://llm.api.cloud.yandex.net/v1/chat/completions
-  api-key: ${YA_AKI_KEY:AQVNz_N0oxosDrP3x5vzLLW3T5AICnEEV9np5ACS}
+#  api-url: https://llm.api.cloud.yandex.net/foundationModels/v1/completion
+  api-key: AQVNz_N0oxosDrP3x5vzLLW3T5AICnEEV9np5ACS
   folder-id: b1gb22ss4gkbdgljv9gt
+#  modelUri: gpt://b1gb22ss4gkbdgljv9gt/yandexgpt/latest
   modelUri: gpt://b1gb22ss4gkbdgljv9gt/qwen3-235b-a22b-fp8/latest
   timeout: 30000
   enabled: true
@@ -32,6 +34,10 @@ analysis:
   rate-limit-max-delay: 30000  # максимальная задержка при exponential backoff (мс) - увеличено до 30 секунд
   rate-limit-max-retries: 5  # максимальное количество повторных попыток при 429
   rate-limit-backoff-multiplier: 2.5  # множитель для exponential backoff - увеличен для более агрессивного backoff
+
+# Contract validation configuration
+contract-validation:
+  use-ai: true  # Use AI-enhanced contract validation with generated requests
 
 # Banking API authentication configuration
 banking:

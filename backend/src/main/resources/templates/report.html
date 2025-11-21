@@ -5,7 +5,7 @@
     <title>API Security Analysis Report</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: Arial, "DejaVu Sans", "Liberation Sans", sans-serif;
             margin: 20px;
             background-color: #f5f5f5;
         }
@@ -63,6 +63,25 @@
             border-radius: 4px;
             margin-top: 10px;
         }
+        .custom-check-result {
+            border-left: 4px solid #9e9e9e;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #fff;
+            border-radius: 4px;
+        }
+        .status-passed { border-left-color: #4CAF50; background-color: #f1f8f4; }
+        .status-failed { border-left-color: #f44336; background-color: #ffebee; }
+        .status-warning { border-left-color: #ff9800; background-color: #fff3e0; }
+        .status-error { border-left-color: #9e9e9e; background-color: #f5f5f5; }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -92,6 +111,7 @@
             <p><strong>Total Endpoints:</strong> <span th:text="${result.totalEndpoints}"></span></p>
             <p><strong>Total Vulnerabilities:</strong> <span th:text="${#lists.size(result.vulnerabilities)}"></span></p>
             <p><strong>Contract Mismatches:</strong> <span th:text="${#lists.size(result.contractMismatches)}"></span></p>
+            <p th:if="${result.customCheckResults}"><strong>Custom Checks:</strong> <span th:text="${#lists.size(result.customCheckResults)}"></span></p>
             <p th:if="${result.summary}"><strong>Summary:</strong> <span th:text="${result.summary}"></span></p>
         </div>
         
@@ -142,6 +162,38 @@
                 </tr>
             </tbody>
         </table>
+        
+        <h2>Custom Checks</h2>
+        <div th:if="${result.customCheckResults == null || #lists.isEmpty(result.customCheckResults)}">
+            <p>No custom checks were executed.</p>
+        </div>
+        <div th:each="checkResult : ${result.customCheckResults}" 
+             th:classappend="'custom-check-result status-' + ${checkResult.status.name().toLowerCase()}">
+            <h3>
+                <span th:text="${checkResult.checkName}"></span>
+                <span th:classappend="'status-badge status-' + ${checkResult.status.name().toLowerCase()}"
+                      th:text="${checkResult.status}"></span>
+            </h3>
+            <p th:if="${checkResult.category}"><strong>Category:</strong> <span th:text="${checkResult.category}"></span></p>
+            <p th:if="${checkResult.result}"><strong>Result:</strong> <span th:text="${checkResult.result}"></span></p>
+            <div th:if="${checkResult.vulnerabilities != null && !#lists.isEmpty(checkResult.vulnerabilities)}">
+                <h4>Found Issues:</h4>
+                <div th:each="vuln : ${checkResult.vulnerabilities}" 
+                     th:classappend="'vulnerability severity-' + ${vuln.severity.name().toLowerCase()}">
+                    <h5>
+                        <span th:classappend="'badge badge-' + ${vuln.severity.name().toLowerCase()}" 
+                              th:text="${vuln.severity}"></span>
+                        <span th:text="${vuln.title}"></span>
+                    </h5>
+                    <p th:if="${vuln.description}"><strong>Description:</strong> <span th:text="${vuln.description}"></span></p>
+                    <p th:if="${vuln.endpoint}"><strong>Endpoint:</strong> <span th:text="${vuln.endpoint}"></span> 
+                       <span th:if="${vuln.method}">(<span th:text="${vuln.method}"></span>)</span></p>
+                </div>
+            </div>
+            <p th:if="${checkResult.executedAt}" style="font-size: 12px; color: #999; margin-top: 10px;">
+                <strong>Executed at:</strong> <span th:text="${#temporals.format(checkResult.executedAt, 'yyyy-MM-dd HH:mm:ss')}"></span>
+            </p>
+        </div>
     </div>
 </body>
 </html>

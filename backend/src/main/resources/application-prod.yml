@@ -12,6 +12,7 @@ cors:
 # AI Agent configuration (Yandex GPT)
 yandexgpt:
   api-url: https://llm.api.cloud.yandex.net/v1/chat/completions
+  api-key: ${YANDEX_GPT_API_KEY:AQVNz_N0oxosDrP3x5vzLLW3T5AICnEEV9np5ACS}
   folder-id: ${YANDEX_FOLDER_ID:b1gb22ss4gkbdgljv9gt}
   modelUri: ${YANDEX_GPT_MODEL_URI:gpt://b1gb22ss4gkbdgljv9gt/qwen3-235b-a22b-fp8/latest}
   timeout: 30000

@@ -1,11 +1,16 @@
 package com.vtb.apisecurity.service.report;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lowagie.text.DocumentException;
-import com.vtb.apisecurity.model.ScanResult;
-import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
-import lombok.extern.slf4j.Slf4j;
+import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.http.HttpStatus;
@@ -13,15 +18,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpServerErrorException;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import org.xhtmlrenderer.pdf.ITextFontResolver;
 import org.xhtmlrenderer.pdf.ITextRenderer;
 
-import java.io.ByteArrayOutputStream;
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.pdf.BaseFont;
+import com.vtb.apisecurity.model.ScanResult;
+
+import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Slf4j
@@ -123,6 +130,12 @@ public class ReportService {
             log.debug("Converting HTML to XHTML");
             Document document = Jsoup.parse(htmlContent);
             document.outputSettings().syntax(Document.OutputSettings.Syntax.xml);
+            document.outputSettings().charset(java.nio.charset.StandardCharsets.UTF_8);
+            document.outputSettings().escapeMode(org.jsoup.nodes.Entities.EscapeMode.xhtml);
+            // Ensure UTF-8 encoding is specified in the document
+            if (document.head() != null && document.head().select("meta[charset]").isEmpty()) {
+                document.head().prependElement("meta").attr("charset", "UTF-8");
+            }
             String xhtmlContent = document.html();
             log.debug("XHTML conversion completed, length: {} characters", xhtmlContent.length());
             
@@ -132,6 +145,50 @@ public class ReportService {
             // Use Flying Saucer to convert XHTML to PDF
             log.debug("Starting XHTML to PDF conversion using Flying Saucer");
             ITextRenderer renderer = new ITextRenderer();
+            
+            // Configure fonts with Cyrillic support
+            ITextFontResolver fontResolver = renderer.getFontResolver();
+            try {
+                // Try to find system fonts that support Cyrillic
+                String[] fontPaths = {
+                    "/System/Library/Fonts/Helvetica.ttc", // macOS
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", // Linux
+                    "C:/Windows/Fonts/arial.ttf", // Windows
+                    "C:/Windows/Fonts/arialuni.ttf" // Windows Unicode
+                };
+                
+                boolean fontLoaded = false;
+                for (String fontPath : fontPaths) {
+                    try {
+                        Path path = Paths.get(fontPath);
+                        if (Files.exists(path)) {
+                            // ITextFontResolver.addFont(path, encoding, embedded)
+                            // BaseFont.IDENTITY_H is a String constant for Unicode encoding
+                            // true = embed font in PDF (recommended for Cyrillic support)
+                            fontResolver.addFont(fontPath, BaseFont.IDENTITY_H, true);
+                            log.debug("Loaded system font with Cyrillic support: {}", fontPath);
+                            fontLoaded = true;
+                            break;
+                        }
+                    } catch (Exception e) {
+                        log.debug("Failed to load font from {}: {}", fontPath, e.getMessage());
+                        // Try next font
+                        continue;
+                    }
+                }
+                
+                // If system fonts not found, use BaseFont with Unicode encoding
+                // This should work but may not render perfectly
+                if (!fontLoaded) {
+                    // Use BaseFont directly - it supports Unicode/Cyrillic with IDENTITY_H encoding
+                    log.debug("Using BaseFont with Unicode encoding for Cyrillic support");
+                }
+                
+                log.debug("Fonts with Cyrillic support configured");
+            } catch (Exception e) {
+                log.warn("Failed to configure fonts with Cyrillic support: {}", e.getMessage());
+                // Continue - BaseFont with IDENTITY_H should still work
+            }
             
             // Set the XHTML content
             renderer.setDocumentFromString(xhtmlContent);

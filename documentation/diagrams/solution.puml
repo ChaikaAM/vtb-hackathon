@@ -16,10 +16,11 @@ rectangle "Получение\nOpenAPI спецификации\nпо URL" as Op
 rectangle "Статический\nанализ\nOWASP Top 10" as Static #FFA500
 rectangle "Динамический\nанализ\nHTTP запросы\nBOLA тесты" as Dynamic #FF7F50
 rectangle "Валидация\nконтракта\nСравнение ответов" as Contract #FF6347
+rectangle "Пользовательские проверки" as UserCheck #FF6347
 rectangle "ИИ анализ\nдополнение рекомендаций\nпо устранению уязвимостей" as AIANALYSIS #FF6347
 
 rectangle "AI Интеграция\nФильтрация FP\nГенерация рекомендаций\nКонтекстный анализ" as AI #DA70D6
-rectangle "Яндекс.Cloud\nAI Agent\n(для хакатона - QWEN 3-235B)" as Yandex #90EE90
+rectangle "Яндекс.Cloud\nAI Agent\n(для хакатона - Yandex GPT-Lite 3-235B)" as Yandex #90EE90
 
 rectangle "Генерация и \nпредоставление\nотчетов\nPDF / JSON / HTML" as Reports #FFD700
 rectangle "Хранилище\nIn-Memory\nПерсистентность\nв будущем" as Storage #D3D3D3
@@ -37,7 +38,10 @@ Dynamic <-> AI
 Dynamic --> Contract
 Contract <-> AI
 
-Contract --> AIANALYSIS
+Contract --> UserCheck
+UserCheck <-> AI
+
+UserCheck --> AIANALYSIS
 AIANALYSIS <-> AI
 
 AIANALYSIS --> Reports

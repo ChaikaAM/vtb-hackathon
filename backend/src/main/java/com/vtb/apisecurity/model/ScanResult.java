@@ -29,6 +29,7 @@ public class ScanResult {
     private List<Vulnerability> vulnerabilities = new ArrayList<>();
     private List<ContractMismatch> contractMismatches = new ArrayList<>();
     private List<EndpointAnalysis> endpointAnalyses = new ArrayList<>();
+    private List<CustomCheckResult> customCheckResults = new ArrayList<>();
     
     // Statistics
     private Map<String, Integer> vulnerabilityCounts;

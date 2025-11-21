@@ -115,7 +115,7 @@ public class AiAgentService {
                 "Описание: %s\n" +
                 "Endpoint: %s %s\n" +
                 "Текущая рекомендация: %s\n\n" +
-                "Дай улучшенную рекомендацию по исправлению этой уязвимости.",
+                "Дай улучшенную рекомендацию по исправлению этой уязвимости на русском языке.",
             vulnerability.getOwaspCategory(),
             vulnerability.getTitle(),
             vulnerability.getDescription(),
@@ -245,6 +245,38 @@ public class AiAgentService {
         return null;
     }
     
+    /**
+     * Очищает ответ от markdown разметки (тройные обратные кавычки)
+     */
+    private String cleanMarkdownCodeBlocks(String text) {
+        if (text == null) {
+            return null;
+        }
+        text = text.trim();
+        
+        // Удаляем ``` в начале (может быть с указанием языка типа ```json)
+        if (text.startsWith("```")) {
+            text = text.substring(3);
+            // Удаляем возможное указание языка (json, например) до переноса строки
+            int newlineIndex = text.indexOf('\n');
+            if (newlineIndex >= 0) {
+                text = text.substring(newlineIndex + 1);
+            } else {
+                // Если нет переноса строки, просто удаляем пробелы
+                text = text.trim();
+            }
+        }
+        
+        // Удаляем ``` в конце
+        text = text.trim();
+        if (text.endsWith("```")) {
+            text = text.substring(0, text.length() - 3);
+        }
+        
+        // Удаляем возможные пустые строки в начале и конце
+        return text.trim();
+    }
+    
     private Vulnerability analyzeVulnerability(Vulnerability vulnerability) throws IOException {
         String prompt = String.format(
             "Проанализируй уязвимость безопасности API:\n\n" +
@@ -253,8 +285,14 @@ public class AiAgentService {
             "Описание: %s\n" +
             "Endpoint: %s %s\n" +
             "Текущая критичность: %s\n\n" +
-            "Оцени критичность уязвимости (CRITICAL, HIGH, MEDIUM, LOW) и дай рекомендацию по исправлению. " +
-            "Ответь в формате JSON: {\"severity\": \"HIGH\", \"recommendation\": \"...\"}",
+            "Задача:\n" +
+            "1. Оцени критичность уязвимости (CRITICAL, HIGH, MEDIUM, LOW)\n" +
+            "2. Дай рекомендацию по исправлению на русском языке\n\n" +
+            "ВАЖНО: Ответь ТОЛЬКО валидным JSON объектом, без дополнительных символов, без markdown разметки, без тройных кавычек, без обратных кавычек.\n" +
+            "Начни ответ сразу с открывающей фигурной скобки { и закончи закрывающей фигурной скобкой }.\n\n" +
+            "Пример правильного формата ответа:\n" +
+            "{\"severity\": \"HIGH\", \"recommendation\": \"Используйте валидацию входных данных и проверку прав доступа\"}\n\n" +
+            "Ответь только JSON объектом:",
             vulnerability.getOwaspCategory(),
             vulnerability.getTitle(),
             vulnerability.getDescription(),
@@ -275,6 +313,8 @@ public class AiAgentService {
                 
                 String textResponse = extractResponseText(responseBody);
                 if (textResponse != null) {
+                    // Очищаем от markdown разметки
+                    textResponse = cleanMarkdownCodeBlocks(textResponse);
                     log.info("AI analysis response for vulnarability {}: \"{}\"", vulnerability, textResponse);
                     // Парсим JSON из ответа GPT
                     try {
@@ -357,6 +397,142 @@ public class AiAgentService {
         }
         
         return false;
+    }
+    
+    /**
+     * Генерирует HTTP запрос на основе OpenAPI спецификации
+     */
+    public String generateRequestFromSpec(String prompt) {
+        if (!isConfigurationValid()) {
+            log.warn("AI agent not configured, cannot generate request");
+            return "{}";
+        }
+        
+        log.info("[AI_AGENT] Generating request from spec");
+        log.debug("[AI_AGENT] Full prompt:\n{}", prompt);
+        
+        Request httpRequest = createYandexGptRequest(prompt).build();
+        
+        long startTime = System.currentTimeMillis();
+        
+        try (Response response = aiAgentClient.newCall(httpRequest).execute()) {
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("[AI_AGENT] AI response received: status={}, duration={}ms", response.code(), duration);
+            
+            if (response.isSuccessful() && response.body() != null) {
+                String responseBody = response.body().string();
+                log.debug("[AI_AGENT] Raw response body length: {} chars", responseBody.length());
+                
+                String textResponse = extractResponseText(responseBody);
+                
+                if (textResponse != null && !textResponse.trim().isEmpty()) {
+                    log.info("[AI_AGENT] Successfully generated request: {} chars", textResponse.length());
+                    log.debug("[AI_AGENT] Generated content:\n{}", textResponse);
+                    return textResponse.trim();
+                } else {
+                    log.warn("[AI_AGENT] Empty response from AI");
+                }
+            } else {
+                log.warn("[AI_AGENT] Request generation failed: status={}", response.code());
+                if (response.body() != null) {
+                    log.debug("[AI_AGENT] Error response: {}", response.body().string());
+                }
+            }
+        } catch (IOException e) {
+            long duration = System.currentTimeMillis() - startTime;
+            log.error("[AI_AGENT] Request generation error after {}ms: {}", duration, e.getMessage(), e);
+        }
+        
+        log.warn("[AI_AGENT] Returning empty request due to error");
+        return "{}";
+    }
+    
+    /**
+     * Валидирует соответствие реального ответа API спецификации через ИИ
+     */
+    public String validateResponseAgainstSpec(String operationDescription, 
+                                              String expectedSchema, 
+                                              String actualResponse,
+                                              int statusCode,
+                                              String expectedStatusCodes) {
+        if (!isConfigurationValid()) {
+            log.warn("[AI_AGENT] AI agent not configured, skipping AI validation");
+            return null;
+        }
+        
+        log.info("[AI_AGENT] Validating response against spec");
+        log.debug("[AI_AGENT] Operation: {}", operationDescription);
+        log.debug("[AI_AGENT] Expected status: {}, Actual: {}", expectedStatusCodes, statusCode);
+        
+        String prompt = String.format(
+            "Проанализируй соответствие реального ответа API спецификации OpenAPI.\n\n" +
+            "=== Операция ===\n%s\n\n" +
+            "=== Ожидаемый статус код ===\n%s\n\n" +
+            "=== Реальный статус код ===\n%d\n\n" +
+            "=== Ожидаемая схема ответа ===\n%s\n\n" +
+            "=== Реальный ответ ===\n%s\n\n" +
+            "Задача:\n" +
+            "1. Проверь соответствие статус-кода спецификации\n" +
+            "2. Проверь соответствие структуры ответа схеме\n" +
+            "3. Найди отсутствующие поля (есть в схеме, нет в ответе)\n" +
+            "4. Найди дополнительные поля (есть в ответе, нет в схеме)\n" +
+            "5. Проверь типы данных полей\n" +
+            "6. Проверь, что обязательные поля действительно обязательные (т.е. должно быть видно, что если обязательное поле отсутствует в ответе, это ошибка).\n" +
+            "7. Проверь, что необязательные поля действительно не обязательные (т.е. если поле не обязательно — ответ может быть валиден и без него).\n\n" +
+            "Верни JSON в формате:\n" +
+            "{\n" +
+            "  \"isValid\": true/false,\n" +
+            "  \"statusCodeMatch\": true/false,\n" +
+            "  \"schemaMatch\": true/false,\n" +
+            "  \"missingFields\": [\"field1\", \"field2\"],\n" +
+            "  \"extraFields\": [\"field3\"],\n" +
+            "  \"typeMismatches\": [{\"field\": \"age\", \"expected\": \"integer\", \"actual\": \"string\"}],\n" +
+            "  \"issues\": [\"Описание проблемы 1\", \"Описание проблемы 2\"],\n" +
+            "  \"summary\": \"Краткое резюме валидации\"\n" +
+            "}",
+            operationDescription,
+            expectedStatusCodes,
+            statusCode,
+            expectedSchema,
+            actualResponse
+        );
+        
+        log.debug("[AI_AGENT] Validation prompt:\n{}", prompt);
+        
+        Request httpRequest = createYandexGptRequest(prompt).build();
+        
+        long startTime = System.currentTimeMillis();
+        
+        try (Response response = aiAgentClient.newCall(httpRequest).execute()) {
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("[AI_AGENT] AI validation response: status={}, duration={}ms", response.code(), duration);
+            
+            if (response.isSuccessful() && response.body() != null) {
+                String responseBody = response.body().string();
+                log.debug("[AI_AGENT] Raw validation response length: {} chars", responseBody.length());
+                
+                String textResponse = extractResponseText(responseBody);
+                
+                if (textResponse != null && !textResponse.trim().isEmpty()) {
+                    log.info("[AI_AGENT] Validation completed: {} chars", textResponse.length());
+                    log.debug("[AI_AGENT] Validation result:\n{}", textResponse);
+                    return textResponse.trim();
+                } else {
+                    log.warn("[AI_AGENT] Empty validation response from AI");
+                }
+            } else {
+                log.warn("[AI_AGENT] AI validation failed: status={}", response.code());
+                if (response.body() != null) {
+                    log.debug("[AI_AGENT] Error response: {}", response.body().string());
+                }
+            }
+        } catch (IOException e) {
+            long duration = System.currentTimeMillis() - startTime;
+            log.error("[AI_AGENT] Validation error after {}ms: {}", duration, e.getMessage(), e);
+        }
+        
+        log.warn("[AI_AGENT] Returning null due to validation error");
+        return null;
     }
 }
 

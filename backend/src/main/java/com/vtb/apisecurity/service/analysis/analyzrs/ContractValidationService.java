@@ -5,11 +5,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vtb.apisecurity.model.ContractMismatch;
+import com.vtb.apisecurity.service.analysis.entity.AiContractValidationService;
 import com.vtb.apisecurity.service.rate.RateLimiterService;
 
 import io.swagger.v3.oas.models.OpenAPI;
@@ -28,12 +30,18 @@ public class ContractValidationService {
     
     private final OkHttpClient httpClient;
     private final RateLimiterService rateLimiterService;
+    private final AiContractValidationService aiContractValidationService;
+    
+    @Value("${contract-validation.use-ai:true}")
+    private boolean useAiValidation;
     
     public ContractValidationService(
             @Qualifier("bankingApiHttpClient") OkHttpClient httpClient,
-            RateLimiterService rateLimiterService) {
+            RateLimiterService rateLimiterService,
+            AiContractValidationService aiContractValidationService) {
         this.httpClient = httpClient;
         this.rateLimiterService = rateLimiterService;
+        this.aiContractValidationService = aiContractValidationService;
     }
     
     private void logHeaders(Request request, String type) {
@@ -72,13 +80,39 @@ public class ContractValidationService {
     }
     
     public List<ContractMismatch> validate(OpenAPI openAPI, String apiBaseUrl, String authToken) {
-        log.info("Starting contract validation");
+        log.info("Starting contract validation (AI-enhanced: {})", useAiValidation);
         List<ContractMismatch> mismatches = new ArrayList<>();
         
         if (openAPI.getPaths() == null) {
             return mismatches;
         }
         
+        // Если включена AI валидация, использовать новый сервис
+        if (useAiValidation) {
+            try {
+                List<ContractMismatch> aiMismatches = aiContractValidationService.validateWithAiGeneratedRequests(
+                    openAPI, apiBaseUrl, authToken);
+                mismatches.addAll(aiMismatches);
+                log.info("AI-enhanced validation found {} mismatches", aiMismatches.size());
+            } catch (Exception e) {
+                log.error("Error in AI validation, falling back to traditional: {}", e.getMessage(), e);
+                // Fallback на традиционную валидацию
+                mismatches.addAll(traditionalValidate(openAPI, apiBaseUrl, authToken));
+            }
+        } else {
+            // Традиционная валидация
+            mismatches.addAll(traditionalValidate(openAPI, apiBaseUrl, authToken));
+        }
+        
+        log.info("Contract validation completed. Found {} mismatches", mismatches.size());
+        return mismatches;
+    }
+    
+    /**
+     * Традиционная валидация (без ИИ)
+     */
+    private List<ContractMismatch> traditionalValidate(OpenAPI openAPI, String apiBaseUrl, String authToken) {
+        List<ContractMismatch> mismatches = new ArrayList<>();
         String baseUrl = apiBaseUrl.endsWith("/") ? apiBaseUrl.substring(0, apiBaseUrl.length() - 1) : apiBaseUrl;
         
         openAPI.getPaths().forEach((path, pathItem) -> {
@@ -90,7 +124,6 @@ public class ContractValidationService {
             }
         });
         
-        log.info("Contract validation completed. Found {} mismatches", mismatches.size());
         return mismatches;
     }
     

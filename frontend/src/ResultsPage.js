@@ -84,6 +84,32 @@ function ResultsPage() {
     );
   };
 
+  const getStatusBadge = (status) => {
+    const statusClass = status.toLowerCase();
+    const statusLabels = {
+      passed: '✅ ПРОЙДЕНО',
+      failed: '❌ ПРОВАЛЕНО',
+      warning: '⚠️ ПРЕДУПРЕЖДЕНИЕ',
+      error: '🔴 ОШИБКА'
+    };
+    return (
+      <span className={`status-badge status-${statusClass}`} style={{
+        padding: '4px 12px',
+        borderRadius: '4px',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        display: 'inline-block',
+        marginLeft: '10px',
+        ...(statusClass === 'passed' ? { background: '#4CAF50', color: 'white' } :
+            statusClass === 'failed' ? { background: '#f44336', color: 'white' } :
+            statusClass === 'warning' ? { background: '#ff9800', color: 'white' } :
+            { background: '#9e9e9e', color: 'white' })
+      }}>
+        {statusLabels[statusClass] || status}
+      </span>
+    );
+  };
+
   if (loading) {
     return (
       <div className="results-page">
@@ -140,6 +166,10 @@ function ResultsPage() {
           <div className="summary-card warning">
             <h3>{result.contractMismatches?.length || 0}</h3>
             <p>Несоответствий контракту</p>
+          </div>
+          <div className="summary-card" style={{ background: '#2196F3' }}>
+            <h3>{result.customCheckResults?.length || 0}</h3>
+            <p>Пользовательских проверок</p>
           </div>
           <div className="summary-card">
             <h3>{result.durationMs ? (result.durationMs / 1000).toFixed(1) + 's' : '-'}</h3>
@@ -215,8 +245,98 @@ function ResultsPage() {
           </div>
         )}
 
+        {result.customCheckResults && result.customCheckResults.length > 0 && (
+          <div className="custom-checks-section" style={{ marginTop: '30px' }}>
+            <h3>🔍 Пользовательские проверки</h3>
+            {result.customCheckResults.map((checkResult, idx) => (
+              <div 
+                key={idx} 
+                className={`custom-check-result status-${checkResult.status?.toLowerCase()}`}
+                style={{
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  padding: '20px',
+                  marginBottom: '20px',
+                  background: checkResult.status === 'PASSED' ? '#f1f8f4' :
+                              checkResult.status === 'FAILED' ? '#ffebee' :
+                              checkResult.status === 'WARNING' ? '#fff3e0' :
+                              '#f5f5f5',
+                  color: '#000'
+                }}
+              >
+                <div className="check-result-header" style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: '15px'
+                }}>
+                  <h4 style={{ margin: 0, fontSize: '18px', color: '#000' }}>{checkResult.checkName}</h4>
+                  {getStatusBadge(checkResult.status)}
+                </div>
+                {checkResult.category && (
+                  <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
+                    Категория: {checkResult.category}
+                  </p>
+                )}
+                <div className="check-result-text" style={{ 
+                  fontSize: '15px', 
+                  lineHeight: '1.6',
+                  marginBottom: '15px',
+                  whiteSpace: 'pre-wrap',
+                  color: '#000'
+                }}>
+                  {checkResult.result}
+                </div>
+                {checkResult.vulnerabilities && checkResult.vulnerabilities.length > 0 && (
+                  <div className="check-vulnerabilities" style={{ marginTop: '15px' }}>
+                    <strong style={{ fontSize: '16px', display: 'block', marginBottom: '10px', color: '#000' }}>
+                      Найденные проблемы:
+                    </strong>
+                    {checkResult.vulnerabilities.map((vuln, vIdx) => (
+                      <div 
+                        key={vIdx} 
+                        className="vulnerability" 
+                        style={{
+                          borderLeft: '4px solid #f44336',
+                          paddingLeft: '15px',
+                          marginBottom: '10px',
+                          background: '#fff',
+                          padding: '10px 15px',
+                          borderRadius: '4px',
+                          color: '#000'
+                        }}
+                      >
+                        <strong style={{ fontSize: '15px', display: 'block', marginBottom: '5px', color: '#000' }}>
+                          {vuln.title}
+                        </strong>
+                        <p style={{ margin: '5px 0', fontSize: '14px', color: '#000' }}>{vuln.description}</p>
+                        {vuln.endpoint && (
+                          <p style={{ margin: '5px 0', fontSize: '13px', color: '#666' }}>
+                            <strong>Endpoint:</strong> {vuln.method} {vuln.endpoint}
+                          </p>
+                        )}
+                        {vuln.severity && (
+                          <span className={`badge ${getSeverityClass(vuln.severity)}`} style={{ marginTop: '5px' }}>
+                            {vuln.severity}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {checkResult.executedAt && (
+                  <p style={{ fontSize: '12px', color: '#999', marginTop: '15px', marginBottom: 0 }}>
+                    Выполнено: {new Date(checkResult.executedAt).toLocaleString('ru-RU')}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {(!result.vulnerabilities || result.vulnerabilities.length === 0) && 
-         (!result.contractMismatches || result.contractMismatches.length === 0) && (
+         (!result.contractMismatches || result.contractMismatches.length === 0) &&
+         (!result.customCheckResults || result.customCheckResults.length === 0) && (
           <div className="no-issues">
             <h3>✅ Проблем не найдено!</h3>
             <p>API соответствует спецификации и не содержит явных уязвимостей.</p>

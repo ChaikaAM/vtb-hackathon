@@ -29,6 +29,28 @@ public class AnalysisController {
     public ScanResult startScan(@Valid @RequestBody ScanRequest request) {
         log.info("Received scan request: openApiUrl={}, apiBaseUrl={}",
             request.getOpenApiUrl(), request.getApiBaseUrl());
+        
+        try {
+            if (request.getOptions() != null) {
+                log.info("Options present: enableStaticAnalysis={}, enableDynamicTesting={}, enableContractValidation={}, enableAiAnalysis={}", 
+                    request.getOptions().isEnableStaticAnalysis(),
+                    request.getOptions().isEnableDynamicTesting(),
+                    request.getOptions().isEnableContractValidation(),
+                    request.getOptions().isEnableAiAnalysis());
+                
+                if (request.getOptions().getCustomChecks() != null) {
+                    log.info("Custom checks in request: count={}, checks={}", 
+                        request.getOptions().getCustomChecks().size(),
+                        request.getOptions().getCustomChecks());
+                } else {
+                    log.info("Custom checks is null in options");
+                }
+            } else {
+                log.info("Options is null in request");
+            }
+        } catch (Exception e) {
+            log.error("Error logging request details: {}", e.getMessage(), e);
+        }
 
         return analysisService.startAnalysis(request);
     }

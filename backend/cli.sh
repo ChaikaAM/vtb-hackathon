@@ -38,16 +38,16 @@ if jar tf "$CLI_JAR" 2>/dev/null | grep -q "^BOOT-INF/"; then
     # Распаковываем JAR во временную директорию и запускаем с правильным classpath
     TEMP_DIR=$(mktemp -d)
     trap "rm -rf $TEMP_DIR" EXIT
-
+    
     cd "$TEMP_DIR"
     jar xf "$CLI_JAR" >/dev/null 2>&1
-
+    
     # Формируем classpath
     CLASSPATH="BOOT-INF/classes"
     for jar in BOOT-INF/lib/*.jar; do
         CLASSPATH="$CLASSPATH:$jar"
     done
-
+    
     # Запускаем CLI класс
     java -cp "$CLASSPATH" com.vtb.apisecurity.cli.ApiSecurityCli "$@"
     EXIT_CODE=$?
